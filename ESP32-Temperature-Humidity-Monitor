@@ -1,0 +1,97 @@
+import serial
+import csv
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+e = serial.Serial('COM5', 115200, timeout = 1)     # CREATES OBJECT e USING CLASS Serial FROM LIBRARY serial AND USES PARAMETERS PORT AND BITRATE
+
+time_seconds = 0
+
+times = []
+temps = []
+humidities = []
+
+file = open("environment_data.csv", "w", newline='')  # CREATE CSV FILE IN WRITE MODE THE NEWLINE MAKES FORMATTING NOT TAKE EXTRA SPACES WHEN WRITE
+
+writer = csv.writer(file) # CREATE A CSV WRITER TO WRITE STRUCTURED ROWS INTO THE FILE
+
+writer.writerow(["Time(s)", "Temperature(C)", "Humidity(%)", "Status"]) # WRITES FIRST ROW OF THE FILE
+
+print("Monitoring Started...")
+
+# Create graph
+fig, ax = plt.subplots()    # FIG USED FOR WINDOW WE USE - AX FOR OUR AXIS THIS - SUBPLOTS USED TO DEFINE THEM AND CREATE THEM
+
+def update(frame):   # DEF ACTS LIKA INFINITE LOOP - UPDATE NAME OF THE FUNCTION - FRAME IS PARAMETER PASSED TO IT
+
+    global time_seconds
+
+    data = e.readline().decode().strip()   # READS SENSOR DATA - DECODES BINARY INTO TOTAL ANALOGUE INPUT - REMOVES EXTRA STUFF
+
+    if "," not in data:
+        return
+
+    try:                      # IF AN ERROR OCCURED GIVES PROPER ERROR MSG
+        parts = data.split(",")       # DATA FROM SENSOR COMMA SEPERATED - CLARIFIES A STRING WITH COMMA WITHIN IS SENT
+        T = float(parts[0])        # FIRST PART SHOWS THE TEMP
+        H = float(parts[1])    # SECOND PART AFTER COMMA SHOWS HUMIDITY
+
+        status = "NORMAL"
+
+        if T > 40:              # CHECKS TEMPERATURE WITHIN ACCEPTABLE LIMITS
+            status = "TOO HOT"
+
+        elif T < 15:
+            status = "TOO COLD"
+
+        if H > 75:         # CHECKS HUMIDITY WITHIN ACCEPTABLE LIMITS
+            status += " | HIGH HUMIDITY"
+
+        elif H < 25:
+            status += " | LOW HUMIDITY"
+
+        print(f"Time: {time_seconds}s")  # print values
+        print(f"Temperature: {T} C")
+        print(f"Humidity: {H}%")
+        print(f"Status: {status}")
+        print("------------------------")
+
+        writer.writerow([ # enter data into csv file
+            time_seconds,
+            T,
+            H,
+            status
+        ])
+
+        file.flush()    # INSTANT SAVE
+
+        times.append(time_seconds)  # ADDS VALUES OF T , H AND TIME INTO THE ARRAYS MADE FOR GRAPHS
+        temps.append(T)
+        humidities.append(H)
+
+        times[:] = times[-20:]      # FOR KEEPING LATEST 20 VALUES ONLY
+        temps[:] = temps[-20:]
+        humidities[:] = humidities[-20:]
+
+        ax.clear()
+
+
+        ax.plot(times, temps, label="Temperature (C)")        # PLOTING AND LABELLING 
+        ax.plot(times, humidities, label="Humidity (%)")
+
+        ax.set_title("Real-Time Environmental Monitoring")
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Sensor Values")
+      
+        ax.legend()
+
+        # Increase time by 2 sec
+        time_seconds += 2
+
+    except:
+        print("Data Error")
+
+# Update graph every 2 seconds
+ani = FuncAnimation(fig, update, interval=2000)  # function from library animation THIS USED FOR LIVE TIME VALUES GRAPHS
+                                                 #PARAMETERS fig WINDOW - update OUR CREATED FUNCTION FROM WHERE TO KEEP ON TAKING LIVE VALUES 
+plt.show()                                       # INTERVAL A BREAK FOR 2 SEC BEFORE TAKING VALUES
